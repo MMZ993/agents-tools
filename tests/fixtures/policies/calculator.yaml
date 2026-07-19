@@ -1,0 +1,5 @@
+principal: calculator
+allow:
+  - calc_*
+deny:
+  - calc_sub

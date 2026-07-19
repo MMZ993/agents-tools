@@ -1,0 +1,4 @@
+principal: reader
+allow:
+  - static_text
+deny: []

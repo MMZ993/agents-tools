@@ -1,0 +1,10 @@
+.agents/
+.git/
+.todos/
+.venv/
+tests/
+docs/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
