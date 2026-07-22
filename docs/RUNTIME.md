@@ -63,6 +63,4 @@ CI verifies commits on `develop`, `main`, and protected numeric semantic tags. O
 
 ## References
 
-- `.agents/PRD.md`
-- `.agents/RULES.md`
 - `tests/fixtures/`
