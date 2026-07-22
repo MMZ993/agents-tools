@@ -3,6 +3,7 @@
 import hashlib
 import importlib.util
 from pathlib import Path
+import sys
 from types import ModuleType
 
 from agents_tools.models import ToolDefinition
@@ -58,9 +59,11 @@ def _load_module(tool_file: Path) -> ModuleType:
         raise ToolRegistrationError(msg)
 
     module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
     try:
         spec.loader.exec_module(module)
     except Exception as error:
+        sys.modules.pop(module_name, None)
         msg = f"tool module import failed: {tool_file}"
         raise ToolRegistrationError(msg) from error
     return module
