@@ -47,6 +47,19 @@ func TestCallToolPreservesAllMCPResultContent(t *testing.T) {
 	}
 }
 
+func TestCallRejectsMismatchedJSONRPCResponseID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":2,"result":{}}`))
+	}))
+	defer server.Close()
+
+	c := &Client{baseURL: server.URL, httpClient: server.Client(), nextID: 1}
+	_, err := c.call("tools/list", map[string]any{})
+	if err == nil || !strings.Contains(err.Error(), "response ID") {
+		t.Fatalf("call() error = %v, want response ID validation error", err)
+	}
+}
+
 func TestPostRejectsNon2xxResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Location", "/redirected")

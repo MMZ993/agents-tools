@@ -81,8 +81,20 @@ type rpcRequest struct {
 
 // rpcResponse is the JSON-RPC 2.0 response envelope.
 type rpcResponse struct {
-	Result json.RawMessage `json:"result,omitempty"`
-	Error  *RPCError       `json:"error,omitempty"`
+	JSONRPC string          `json:"jsonrpc"`
+	ID      *int64          `json:"id"`
+	Result  json.RawMessage `json:"result,omitempty"`
+	Error   *RPCError       `json:"error,omitempty"`
+}
+
+func validateResponse(response rpcResponse, id int64) error {
+	if response.JSONRPC != "2.0" {
+		return fmt.Errorf("invalid JSON-RPC version %q", response.JSONRPC)
+	}
+	if response.ID == nil || *response.ID != id {
+		return fmt.Errorf("unexpected JSON-RPC response ID")
+	}
+	return nil
 }
 
 // RPCError is a JSON-RPC error.
@@ -150,6 +162,9 @@ func (c *Client) call(method string, params any) (json.RawMessage, error) {
 			return nil, fmt.Errorf("decode response: %w", err)
 		}
 	}
+	if err := validateResponse(rpc, id); err != nil {
+		return nil, err
+	}
 	if rpc.Error != nil {
 		return nil, rpc.Error
 	}
@@ -195,6 +210,9 @@ func (c *Client) initSession() error {
 		if err := json.Unmarshal(body, &initResp); err != nil {
 			return fmt.Errorf("decode initialize response: %w", err)
 		}
+	}
+	if err := validateResponse(initResp, id); err != nil {
+		return err
 	}
 	if initResp.Error != nil {
 		return initResp.Error
