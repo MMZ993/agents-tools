@@ -40,8 +40,11 @@ func New() (*Client, error) {
 	timeout := 30 * time.Second
 	if s := os.Getenv("AGENTS_TOOLS_TIMEOUT"); s != "" {
 		secs, err := strconv.Atoi(s)
-		if err != nil {
-			return nil, fmt.Errorf("AGENTS_TOOLS_TIMEOUT must be an integer: %w", err)
+		if err != nil || secs <= 0 {
+			if err != nil {
+				return nil, fmt.Errorf("AGENTS_TOOLS_TIMEOUT must be a positive integer: %w", err)
+			}
+			return nil, fmt.Errorf("AGENTS_TOOLS_TIMEOUT must be a positive integer")
 		}
 		timeout = time.Duration(secs) * time.Second
 	}

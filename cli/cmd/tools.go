@@ -69,8 +69,11 @@ var toolsCallCmd = &cobra.Command{
 func buildArguments(jsonStr string, argFlags []string) (map[string]any, error) {
 	args := map[string]any{}
 	if jsonStr != "" {
-		if err := json.Unmarshal([]byte(jsonStr), &args); err != nil {
-			return nil, fmt.Errorf("--json must be a JSON object: %w", err)
+		if err := json.Unmarshal([]byte(jsonStr), &args); err != nil || args == nil {
+			if err != nil {
+				return nil, fmt.Errorf("--json must be a JSON object: %w", err)
+			}
+			return nil, fmt.Errorf("--json must be a JSON object")
 		}
 	}
 	for _, kv := range argFlags {
