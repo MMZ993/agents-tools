@@ -107,6 +107,18 @@ func TestNewClientDoesNotFollowRedirects(t *testing.T) {
 	}
 }
 
+func TestNotifyRequiresEmpty202Response(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	c := &Client{baseURL: server.URL, httpClient: server.Client()}
+	if err := c.notify("notifications/initialized"); err == nil {
+		t.Fatal("notify() error = nil, want response validation error")
+	}
+}
+
 func TestCallRejectsMismatchedJSONRPCResponseID(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":2,"result":{}}`))
@@ -167,7 +179,7 @@ func TestPostRejectsNon2xxResponse(t *testing.T) {
 		},
 	}
 
-	_, _, err := c.post(rpcRequest{JSONRPC: "2.0", Method: "tools/list"})
+	_, _, _, err := c.post(rpcRequest{JSONRPC: "2.0", Method: "tools/list"})
 	apiErr, ok := err.(*APIError)
 	if !ok || apiErr.StatusCode != http.StatusFound {
 		t.Fatalf("post() error = %v, want API error with status %d", err, http.StatusFound)

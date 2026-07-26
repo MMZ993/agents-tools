@@ -147,15 +147,15 @@ func (e *RPCError) Error() string {
 
 // post sends a JSON-RPC payload to /mcp/ and returns the raw body and headers.
 // It applies auth, protocol version, and session headers.
-func (c *Client) post(req rpcRequest) (json.RawMessage, http.Header, error) {
+func (c *Client) post(req rpcRequest) (json.RawMessage, int, http.Header, error) {
 	b, err := json.Marshal(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("marshal request: %w", err)
+		return nil, 0, nil, fmt.Errorf("marshal request: %w", err)
 	}
 
 	httpReq, err := http.NewRequest(http.MethodPost, c.baseURL+"/mcp/", bytes.NewReader(b))
 	if err != nil {
-		return nil, nil, fmt.Errorf("build request: %w", err)
+		return nil, 0, nil, fmt.Errorf("build request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", acceptHeader)
@@ -169,27 +169,27 @@ func (c *Client) post(req rpcRequest) (json.RawMessage, http.Header, error) {
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, nil, fmt.Errorf("request failed: %w", err)
+		return nil, 0, nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, nil, fmt.Errorf("read response: %w", err)
+		return nil, 0, nil, fmt.Errorf("read response: %w", err)
 	}
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, resp.Header, &APIError{StatusCode: resp.StatusCode, Body: string(body)}
+		return nil, resp.StatusCode, resp.Header, &APIError{StatusCode: resp.StatusCode, Body: string(body)}
 	}
 
-	return body, resp.Header, nil
+	return body, resp.StatusCode, resp.Header, nil
 }
 
 // call sends a JSON-RPC request (with id) and decodes the result.
 func (c *Client) call(method string, params any) (json.RawMessage, error) {
 	id := c.nextID
 	c.nextID++
-	body, _, err := c.post(rpcRequest{JSONRPC: "2.0", ID: &id, Method: method, Params: params})
+	body, _, _, err := c.post(rpcRequest{JSONRPC: "2.0", ID: &id, Method: method, Params: params})
 	if err != nil {
 		return nil, err
 	}
@@ -209,8 +209,14 @@ func (c *Client) call(method string, params any) (json.RawMessage, error) {
 
 // notify sends a JSON-RPC notification (no id); the broker replies 202 with no body.
 func (c *Client) notify(method string) error {
-	_, _, err := c.post(rpcRequest{JSONRPC: "2.0", Method: method})
-	return err
+	body, status, _, err := c.post(rpcRequest{JSONRPC: "2.0", Method: method})
+	if err != nil {
+		return err
+	}
+	if status != http.StatusAccepted || len(body) != 0 {
+		return fmt.Errorf("notification response must be 202 Accepted with an empty body")
+	}
+	return nil
 }
 
 // initSession performs the MCP initialize handshake and stores the session id.
@@ -224,7 +230,7 @@ func (c *Client) initSession() error {
 	id := c.nextID
 	c.nextID++
 
-	body, hdr, err := c.post(rpcRequest{
+	body, _, hdr, err := c.post(rpcRequest{
 		JSONRPC: "2.0",
 		ID:      &id,
 		Method:  "initialize",
