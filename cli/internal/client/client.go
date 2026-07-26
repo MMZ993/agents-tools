@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -36,6 +37,7 @@ func New() (*Client, error) {
 	if baseURL == "" {
 		baseURL = defaultBaseURL
 	}
+	baseURL = strings.TrimRight(baseURL, "/")
 
 	timeout := 30 * time.Second
 	if s := os.Getenv("AGENTS_TOOLS_TIMEOUT"); s != "" {

@@ -93,6 +93,25 @@ func TestHealthRejectsNon2xxResponse(t *testing.T) {
 	}
 }
 
+func TestNewNormalizesTrailingSlashInBaseURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/healthz" {
+			t.Fatalf("request path = %q, want /healthz", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("AGENTS_TOOLS_URL", server.URL+"/")
+	client, err := New()
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	if _, err := client.Health(); err != nil {
+		t.Fatalf("Health() error = %v", err)
+	}
+}
+
 func TestNewRejectsNonPositiveTimeout(t *testing.T) {
 	for _, value := range []string{"0", "-1"} {
 		t.Run(value, func(t *testing.T) {
