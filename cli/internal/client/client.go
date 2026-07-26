@@ -90,6 +90,7 @@ type rpcResponse struct {
 	Error     *RPCError       `json:"error,omitempty"`
 	hasResult bool
 	hasError  bool
+	errorRaw  json.RawMessage
 }
 
 func decodeResponse(body []byte) (rpcResponse, error) {
@@ -102,7 +103,7 @@ func decodeResponse(body []byte) (rpcResponse, error) {
 		return rpcResponse{}, err
 	}
 	_, response.hasResult = fields["result"]
-	_, response.hasError = fields["error"]
+	response.errorRaw, response.hasError = fields["error"]
 	return response, nil
 }
 
@@ -115,6 +116,21 @@ func validateResponse(response rpcResponse, id int64) error {
 	}
 	if response.hasResult == response.hasError {
 		return fmt.Errorf("JSON-RPC response must contain exactly one result or error")
+	}
+	if response.hasError {
+		if response.Error == nil {
+			return fmt.Errorf("JSON-RPC error must be an object")
+		}
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(response.errorRaw, &fields); err != nil {
+			return fmt.Errorf("decode JSON-RPC error: %w", err)
+		}
+		if _, ok := fields["code"]; !ok {
+			return fmt.Errorf("JSON-RPC error must contain code")
+		}
+		if _, ok := fields["message"]; !ok {
+			return fmt.Errorf("JSON-RPC error must contain message")
+		}
 	}
 	return nil
 }

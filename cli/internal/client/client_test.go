@@ -133,6 +133,24 @@ func TestCallRejectsJSONRPCResponseWithoutResultOrError(t *testing.T) {
 	}
 }
 
+func TestCallRejectsMalformedJSONRPCError(t *testing.T) {
+	for name, response := range map[string]string{
+		"null":            `{"jsonrpc":"2.0","id":1,"error":null}`,
+		"missing message": `{"jsonrpc":"2.0","id":1,"error":{"code":-1}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte(response))
+			}))
+			defer server.Close()
+			c := &Client{baseURL: server.URL, httpClient: server.Client(), nextID: 1}
+			if _, err := c.call("tools/list", map[string]any{}); err == nil {
+				t.Fatal("call() error = nil, want malformed error rejection")
+			}
+		})
+	}
+}
+
 func TestPostRejectsNon2xxResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Location", "/redirected")

@@ -34,7 +34,7 @@ verify_cli:
 
 publish_image:
   stage: publish
-  needs: [verify]
+  needs: [verify, verify_cli]
   script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - |
