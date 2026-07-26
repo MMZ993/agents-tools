@@ -22,6 +22,16 @@ verify:
     - uv run ruff format --check .
     - uv run ty check
 
+verify_cli:
+  image: golang:1.26.1
+  stage: verify
+  script:
+    - cd cli
+    - test -z "$(gofmt -l .)"
+    - go vet ./...
+    - go test -race ./...
+    - go build ./...
+
 publish_image:
   stage: publish
   needs: [verify]
