@@ -251,6 +251,12 @@ type Tool struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
 	InputSchema json.RawMessage `json:"inputSchema"`
+	raw         json.RawMessage
+}
+
+// MarshalJSON preserves all tool fields returned by the broker.
+func (t Tool) MarshalJSON() ([]byte, error) {
+	return t.raw.MarshalJSON()
 }
 
 // ListTools discovers the tools available to the authenticated principal.
@@ -263,12 +269,19 @@ func (c *Client) ListTools() ([]Tool, error) {
 		return nil, err
 	}
 	var resp struct {
-		Tools []Tool `json:"tools"`
+		Tools []json.RawMessage `json:"tools"`
 	}
 	if err := json.Unmarshal(result, &resp); err != nil {
 		return nil, fmt.Errorf("decode tools: %w", err)
 	}
-	return resp.Tools, nil
+	tools := make([]Tool, len(resp.Tools))
+	for i, raw := range resp.Tools {
+		if err := json.Unmarshal(raw, &tools[i]); err != nil {
+			return nil, fmt.Errorf("decode tool: %w", err)
+		}
+		tools[i].raw = raw
+	}
+	return tools, nil
 }
 
 // GetTool returns the tool with the given name. The broker exposes no per-tool

@@ -8,6 +8,44 @@ import (
 	"testing"
 )
 
+func TestListToolsPreservesAllMCPToolFields(t *testing.T) {
+	const toolsResult = `[{"name":"mail_read_attachment","description":"Read an attachment.","inputSchema":{"type":"object"},"title":"Read attachment","outputSchema":{"type":"object"},"annotations":{"readOnlyHint":true},"x-extension":{"scope":"mail"}}]`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Method string `json:"method"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		switch request.Method {
+		case "initialize":
+			w.Header().Set("Mcp-Session-Id", "test-session")
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{}}`))
+		case "notifications/initialized":
+			w.WriteHeader(http.StatusAccepted)
+		case "tools/list":
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":2,"result":{"tools":` + toolsResult + `}}`))
+		default:
+			t.Fatalf("unexpected MCP method %q", request.Method)
+		}
+	}))
+	defer server.Close()
+
+	c := &Client{baseURL: server.URL, token: "test-token", httpClient: server.Client()}
+	tools, err := c.ListTools()
+	if err != nil {
+		t.Fatalf("ListTools() error = %v", err)
+	}
+	got, err := json.Marshal(tools)
+	if err != nil {
+		t.Fatalf("marshal tools: %v", err)
+	}
+	if string(got) != toolsResult {
+		t.Fatalf("ListTools() = %s, want %s", got, toolsResult)
+	}
+}
+
 func TestCallToolPreservesAllMCPResultContent(t *testing.T) {
 	const toolResult = `{"content":[{"type":"image","data":"aGVsbG8=","mimeType":"text/plain"},{"type":"resource_link","uri":"https://example.test/attachment","name":"attachment.txt","mimeType":"text/plain"}],"structuredContent":{"attachmentCount":2},"isError":false}`
 
