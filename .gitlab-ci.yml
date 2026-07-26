@@ -1,5 +1,7 @@
 stages:
   - verify
+  - build
+  - integration
   - publish
 
 default:
@@ -32,9 +34,33 @@ verify_cli:
     - go test -race ./...
     - go build ./...
 
+build_cli_artifact:
+  image: golang:1.26.1
+  stage: build
+  needs: [verify_cli]
+  script:
+    - cd cli
+    - mkdir -p dist
+    - GOOS=linux GOARCH=amd64 go build -o dist/agents-tools .
+    - tar -C dist -czf "dist/agents-tools-cli-linux-amd64-${CI_COMMIT_SHORT_SHA}.tar.gz" agents-tools
+  artifacts:
+    name: "agents-tools-cli-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - cli/dist/agents-tools
+      - cli/dist/agents-tools-cli-linux-amd64-*.tar.gz
+    expire_in: 14 days
+
+integration_cli:
+  image: ghcr.io/astral-sh/uv:0.10.0@sha256:78a7ff97cd27b7124a5f3c2aefe146170793c56a1e03321dd31a289f6d82a04f
+  stage: integration
+  needs: [verify, build_cli_artifact]
+  script:
+    - uv sync --frozen --all-groups
+    - bash ./scripts/ci_smoke_cli.sh
+
 publish_image:
   stage: publish
-  needs: [verify, verify_cli]
+  needs: [verify, verify_cli, build_cli_artifact, integration_cli]
   script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - |
@@ -65,3 +91,12 @@ publish_image:
   rules:
     - if: '$CI_COMMIT_TAG =~ /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/ && $CI_COMMIT_REF_PROTECTED == "true"'
     - if: '$CI_COMMIT_BRANCH == "main"'
+
+publish_cli_package:
+  image: golang:1.26.1
+  stage: publish
+  needs: [build_cli_artifact, integration_cli]
+  script:
+    - bash ./scripts/ci_publish_cli_package.sh
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/ && $CI_COMMIT_REF_PROTECTED == "true"'

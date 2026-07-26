@@ -16,6 +16,8 @@ make build-all       # cross-compile linux/amd64 + linux/arm64
 cp dist/agents-tools /usr/local/bin/agents-tools
 ```
 
+CI retains a Linux amd64 build artifact for 14 days on every pipeline. Protected semantic-version tags also publish `agents-tools-cli-linux-amd64-<version>.tar.gz` to the GitLab Generic Package Registry.
+
 ## Configuration
 
 Set environment variables before running. No config file needed.
