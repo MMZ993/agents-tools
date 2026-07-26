@@ -112,6 +112,15 @@ func TestNewNormalizesTrailingSlashInBaseURL(t *testing.T) {
 	}
 }
 
+func TestNewRejectsTimeoutThatOverflowsDuration(t *testing.T) {
+	t.Setenv("AGENTS_TOOLS_TIMEOUT", "9223372037")
+
+	_, err := New()
+	if err == nil || !strings.Contains(err.Error(), "positive integer") {
+		t.Fatalf("New() error = %v, want positive integer validation error", err)
+	}
+}
+
 func TestNewRejectsNonPositiveTimeout(t *testing.T) {
 	for _, value := range []string{"0", "-1"} {
 		t.Run(value, func(t *testing.T) {
