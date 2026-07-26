@@ -57,6 +57,9 @@ func New() (*Client, error) {
 		token:   os.Getenv("AGENTS_TOOLS_MCP_ADMIN_TOKEN"),
 		httpClient: &http.Client{
 			Timeout: timeout,
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
 		},
 	}, nil
 }
@@ -81,10 +84,26 @@ type rpcRequest struct {
 
 // rpcResponse is the JSON-RPC 2.0 response envelope.
 type rpcResponse struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      *int64          `json:"id"`
-	Result  json.RawMessage `json:"result,omitempty"`
-	Error   *RPCError       `json:"error,omitempty"`
+	JSONRPC   string          `json:"jsonrpc"`
+	ID        *int64          `json:"id"`
+	Result    json.RawMessage `json:"result,omitempty"`
+	Error     *RPCError       `json:"error,omitempty"`
+	hasResult bool
+	hasError  bool
+}
+
+func decodeResponse(body []byte) (rpcResponse, error) {
+	var response rpcResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return rpcResponse{}, err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		return rpcResponse{}, err
+	}
+	_, response.hasResult = fields["result"]
+	_, response.hasError = fields["error"]
+	return response, nil
 }
 
 func validateResponse(response rpcResponse, id int64) error {
@@ -93,6 +112,9 @@ func validateResponse(response rpcResponse, id int64) error {
 	}
 	if response.ID == nil || *response.ID != id {
 		return fmt.Errorf("unexpected JSON-RPC response ID")
+	}
+	if response.hasResult == response.hasError {
+		return fmt.Errorf("JSON-RPC response must contain exactly one result or error")
 	}
 	return nil
 }
@@ -156,11 +178,9 @@ func (c *Client) call(method string, params any) (json.RawMessage, error) {
 		return nil, err
 	}
 
-	var rpc rpcResponse
-	if len(body) > 0 {
-		if err := json.Unmarshal(body, &rpc); err != nil {
-			return nil, fmt.Errorf("decode response: %w", err)
-		}
+	rpc, err := decodeResponse(body)
+	if err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	if err := validateResponse(rpc, id); err != nil {
 		return nil, err
@@ -205,11 +225,9 @@ func (c *Client) initSession() error {
 		return err
 	}
 
-	var initResp rpcResponse
-	if len(body) > 0 {
-		if err := json.Unmarshal(body, &initResp); err != nil {
-			return fmt.Errorf("decode initialize response: %w", err)
-		}
+	initResp, err := decodeResponse(body)
+	if err != nil {
+		return fmt.Errorf("decode initialize response: %w", err)
 	}
 	if err := validateResponse(initResp, id); err != nil {
 		return err

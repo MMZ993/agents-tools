@@ -47,6 +47,28 @@ func TestCallToolPreservesAllMCPResultContent(t *testing.T) {
 	}
 }
 
+func TestNewClientDoesNotFollowRedirects(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/healthz" {
+			http.Redirect(w, r, "/redirected", http.StatusFound)
+			return
+		}
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("AGENTS_TOOLS_URL", server.URL)
+	client, err := New()
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	_, err = client.Health()
+	apiErr, ok := err.(*APIError)
+	if !ok || apiErr.StatusCode != http.StatusFound {
+		t.Fatalf("Health() error = %v, want API error with status %d", err, http.StatusFound)
+	}
+}
+
 func TestCallRejectsMismatchedJSONRPCResponseID(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":2,"result":{}}`))
@@ -57,6 +79,19 @@ func TestCallRejectsMismatchedJSONRPCResponseID(t *testing.T) {
 	_, err := c.call("tools/list", map[string]any{})
 	if err == nil || !strings.Contains(err.Error(), "response ID") {
 		t.Fatalf("call() error = %v, want response ID validation error", err)
+	}
+}
+
+func TestCallRejectsJSONRPCResponseWithoutResultOrError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1}`))
+	}))
+	defer server.Close()
+
+	c := &Client{baseURL: server.URL, httpClient: server.Client(), nextID: 1}
+	_, err := c.call("tools/list", map[string]any{})
+	if err == nil || !strings.Contains(err.Error(), "result or error") {
+		t.Fatalf("call() error = %v, want result or error validation error", err)
 	}
 }
 
