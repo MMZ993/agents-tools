@@ -105,30 +105,10 @@ func coerceArg(v string) any {
 	return v
 }
 
-// printCallResult prints the tool result text. With --pretty, JSON-looking text
-// is re-indented; otherwise the result is emitted as a compact JSON object.
+// printCallResult writes the complete MCP result without dropping content types
+// or extension fields.
 func printCallResult(r *client.CallToolResult) {
-	text := ""
-	if len(r.Content) > 0 {
-		text = r.Content[0].Text
-	}
-	if pretty {
-		if indented, err := reindentMaybe(text); err == nil {
-			fmt.Println(string(indented))
-			return
-		}
-		fmt.Println(text)
-		return
-	}
-	printJSON(map[string]any{"text": text, "isError": r.IsError})
-}
-
-func reindentMaybe(text string) ([]byte, error) {
-	var v any
-	if err := json.Unmarshal([]byte(text), &v); err != nil {
-		return nil, err
-	}
-	return json.MarshalIndent(v, "", "  ")
+	printRawJSON(r.JSON())
 }
 
 var toolsSchemaCmd = &cobra.Command{

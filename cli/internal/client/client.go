@@ -247,16 +247,21 @@ func (c *Client) GetTool(name string) (*Tool, error) {
 	return nil, fmt.Errorf("tool %q not found", name)
 }
 
-// CallToolResult is the MCP result of a tools/call invocation.
+// CallToolResult preserves the complete MCP result of a tools/call invocation.
 type CallToolResult struct {
-	Content []Content `json:"content"`
-	IsError bool      `json:"isError"`
+	raw     json.RawMessage
+	IsError bool `json:"isError"`
 }
 
-// Content is one content item in a tool result.
-type Content struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+// JSON returns the original MCP result for output without dropping content types
+// or extension fields.
+func (r *CallToolResult) JSON() json.RawMessage {
+	return r.raw
+}
+
+// MarshalJSON preserves all MCP result fields for callers that serialize a result.
+func (r CallToolResult) MarshalJSON() ([]byte, error) {
+	return r.raw.MarshalJSON()
 }
 
 // CallTool invokes a tool by name with the given arguments.
@@ -275,6 +280,7 @@ func (c *Client) CallTool(name string, args map[string]any) (*CallToolResult, er
 	if err := json.Unmarshal(result, &out); err != nil {
 		return nil, fmt.Errorf("decode tool result: %w", err)
 	}
+	out.raw = result
 	return &out, nil
 }
 

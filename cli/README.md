@@ -44,6 +44,8 @@ agents_openclaw() { AGENTS_TOOLS_MCP_ADMIN_TOKEN=openclaw_token agents-tools "$@
 - **Default**: compact JSON (agent/pipe-friendly)
 - **`--pretty` / `-p`**: indented JSON
 
+`tools call` emits the complete MCP tool result, including every `content` item, `structuredContent`, and `isError`. This preserves text, images, audio, embedded resources, and resource links.
+
 All errors go to stderr with exit code 1. Success goes to stdout with exit code 0. A tool call that returns `isError: true` (policy deny, invalid arguments, tool failure) also exits 1.
 
 ## Commands
