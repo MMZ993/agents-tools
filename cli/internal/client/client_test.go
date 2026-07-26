@@ -47,6 +47,52 @@ func TestCallToolPreservesAllMCPResultContent(t *testing.T) {
 	}
 }
 
+func TestPostRejectsNon2xxResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", "/redirected")
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer server.Close()
+
+	c := &Client{
+		baseURL: server.URL,
+		httpClient: &http.Client{
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
+	}
+
+	_, _, err := c.post(rpcRequest{JSONRPC: "2.0", Method: "tools/list"})
+	apiErr, ok := err.(*APIError)
+	if !ok || apiErr.StatusCode != http.StatusFound {
+		t.Fatalf("post() error = %v, want API error with status %d", err, http.StatusFound)
+	}
+}
+
+func TestHealthRejectsNon2xxResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", "/redirected")
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer server.Close()
+
+	c := &Client{
+		baseURL: server.URL,
+		httpClient: &http.Client{
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
+	}
+
+	_, err := c.Health()
+	apiErr, ok := err.(*APIError)
+	if !ok || apiErr.StatusCode != http.StatusFound {
+		t.Fatalf("Health() error = %v, want API error with status %d", err, http.StatusFound)
+	}
+}
+
 func TestNewRejectsNonPositiveTimeout(t *testing.T) {
 	for _, value := range []string{"0", "-1"} {
 		t.Run(value, func(t *testing.T) {

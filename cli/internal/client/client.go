@@ -125,7 +125,7 @@ func (c *Client) post(req rpcRequest) (json.RawMessage, http.Header, error) {
 		return nil, nil, fmt.Errorf("read response: %w", err)
 	}
 
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return nil, resp.Header, &APIError{StatusCode: resp.StatusCode, Body: string(body)}
 	}
 
@@ -299,7 +299,7 @@ func (c *Client) Health() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read response: %w", err)
 	}
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return "", &APIError{StatusCode: resp.StatusCode, Body: string(body)}
 	}
 	return string(body), nil
