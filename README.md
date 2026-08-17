@@ -1,6 +1,11 @@
 # Agents Tools
 
-This service was generated from English-language instructions by a transformer-based large language model (LLM).
+Bespoke private software, created using LLM agent-assisted coding. Intended to run in a private homelab.
+Deployment and tools configuration are handled by separate private repos.
+
+Hosted on local GitLab; a public mirror is available on GitHub.
+
+## Overview
 
 This repository provides the portable runtime for a policy-enforcing internal MCP broker over HTTP. Traefik terminates HTTPS in deployment.
 
