@@ -5,6 +5,7 @@ description = "Portable, policy-enforcing MCP broker runtime"
 readme = "README.md"
 requires-python = ">=3.14,<3.15"
 dependencies = [
+    "caldav==3.2.0",
     "jsonschema==4.26.0",
     "mcp==1.28.1",
     "prometheus-client==0.25.0",
