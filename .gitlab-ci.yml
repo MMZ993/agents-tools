@@ -42,7 +42,7 @@ build_cli_artifact:
   script:
     - cd cli
     - mkdir -p dist
-    - GOOS=linux GOARCH=amd64 go build -o dist/agents-tools .
+    - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/agents-tools .
     - tar -C dist -czf "dist/agents-tools-cli-linux-amd64-${CI_COMMIT_SHORT_SHA}.tar.gz" agents-tools
   artifacts:
     name: "agents-tools-cli-${CI_COMMIT_SHORT_SHA}"
