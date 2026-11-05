@@ -55,10 +55,14 @@ All errors go to stderr with exit code 1. Success goes to stdout with exit code 
 ### tools
 
 ```bash
-agents-tools tools list [--pretty]
+agents-tools tools list [--group <group> | --all] [--pretty]
 agents-tools tools schema <name> [--pretty]
 agents-tools tools call <name> [--arg key=value]... [--json '{}'] [--pretty]
 ```
+
+`tools list` returns principal-visible groups and counts as versioned JSON. `--group` returns tool names and descriptions for one group. These modes require an authorized `broker_discover` tool on a compatible broker; unavailable discovery, denied access, unknown groups, and malformed responses fail rather than falling back to the full list. `--all` retains the original JSON array of complete MCP tools, including schemas and extension fields. `--group` and `--all` are mutually exclusive.
+
+The default output is a breaking change for scripts that consumed the full array: migrate them to `tools list --all` before upgrading, and coordinate CLI/broker rollout; roll back the CLI if discovery is unavailable.
 
 `--arg` values are coerced: `true`/`false` → bool, integers → int, otherwise string. `--json` takes a full JSON object and is applied first, with `--arg` overrides on top.
 
@@ -73,6 +77,12 @@ agents-tools health [--pretty]     # GET /healthz, no authentication
 ```bash
 # Discover available tools for this principal
 agents-tools tools list --pretty
+
+# List tools in a visible group
+agents-tools tools list --group spotify --pretty
+
+# Preserve the original full MCP listing
+agents-tools tools list --all --pretty
 
 # Inspect one tool's input schema to learn how to call it
 agents-tools tools schema spotify_search --pretty

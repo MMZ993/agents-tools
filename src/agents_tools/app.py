@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
+import json
 from typing import Any
 
 import jsonschema
@@ -22,6 +23,11 @@ from agents_tools.logging import audit_debug, audit_event, redact_arguments
 from agents_tools.metrics import record_authentication, record_invocation
 from agents_tools.models import ToolDefinition
 from agents_tools.policy import Policy
+from agents_tools.tools import DISCOVERY_TOOL_ID
+
+
+class DiscoveryError(ValueError):
+    """A safe, client-visible discovery request error."""
 
 
 class AuthenticationMiddleware(BaseHTTPMiddleware):
@@ -103,12 +109,70 @@ def create_app(
 def _create_server(
     principal: str, policy: Policy | None, tools: Mapping[str, ToolDefinition]
 ) -> Server:
+    if DISCOVERY_TOOL_ID in tools:
+        raise ValueError(f"reserved tool ID: {DISCOVERY_TOOL_ID}")
     server = Server(f"agents-tools-{principal}")
     allowed_tools = {
         tool_id: definition
         for tool_id, definition in tools.items()
         if policy is not None and policy.permits(tool_id)
     }
+
+    async def discover(arguments: dict[str, object]) -> str:
+        operation = arguments["operation"]
+        group = arguments.get("group")
+        if operation == "groups" and group is None:
+            counts: dict[str, int] = {}
+            for definition in allowed_tools.values():
+                assert definition.group is not None
+                counts[definition.group] = counts.get(definition.group, 0) + 1
+            result = {
+                "version": 1,
+                "groups": [
+                    {"name": name, "count": counts[name]} for name in sorted(counts)
+                ],
+            }
+        elif operation == "tools" and isinstance(group, str):
+            selected = sorted(
+                (
+                    definition
+                    for definition in allowed_tools.values()
+                    if definition.group == group
+                ),
+                key=lambda definition: definition.tool_id,
+            )
+            if not selected:
+                raise DiscoveryError("unknown group")
+            result = {
+                "version": 1,
+                "group": group,
+                "tools": [
+                    {"name": definition.tool_id, "description": definition.description}
+                    for definition in selected
+                ],
+            }
+        else:
+            raise DiscoveryError("invalid discovery arguments")
+        return json.dumps(result, separators=(",", ":"))
+
+    discovery = ToolDefinition(
+        tool_id=DISCOVERY_TOOL_ID,
+        group="broker",
+        description="List visible tool groups or tools in a group.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "operation": {"type": "string", "enum": ["groups", "tools"]},
+                "group": {"type": "string", "pattern": "^[a-z][a-z0-9]*$"},
+            },
+            "required": ["operation"],
+            "additionalProperties": False,
+        },
+        handler=discover,
+    )
+    visible_tools = dict(allowed_tools)
+    if policy is not None and policy.permits(DISCOVERY_TOOL_ID):
+        visible_tools[DISCOVERY_TOOL_ID] = discovery
 
     @server.list_tools()
     async def list_tools() -> list[mcp_types.Tool]:
@@ -118,14 +182,14 @@ def _create_server(
                 description=definition.description,
                 inputSchema=dict(definition.input_schema),
             )
-            for definition in allowed_tools.values()
+            for definition in visible_tools.values()
         ]
 
     @server.call_tool()
     async def call_tool(
         name: str, arguments: dict[str, object]
     ) -> mcp_types.CallToolResult:
-        definition = allowed_tools.get(name)
+        definition = visible_tools.get(name)
         if definition is None or policy is None or not policy.permits(name):
             record_invocation(principal, "unknown", "denied")
             audit_event(
@@ -152,6 +216,15 @@ def _create_server(
         try:
             result = await definition.handler(arguments)
             serialized_result = str(result)
+        except DiscoveryError as error:
+            record_invocation(principal, name, "denied")
+            audit_event(
+                "tool_invocation", principal=principal, tool=name, outcome="denied"
+            )
+            return mcp_types.CallToolResult(
+                content=[mcp_types.TextContent(type="text", text=str(error))],
+                isError=True,
+            )
         except Exception:
             record_invocation(principal, name, "error")
             audit_event(

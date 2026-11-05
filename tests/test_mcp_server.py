@@ -1,3 +1,5 @@
+import json
+
 import mcp.types as mcp_types
 
 from agents_tools.app import _create_server
@@ -135,6 +137,37 @@ async def test_successful_invocation_logs_arguments_only_at_debug_with_redaction
             "arguments": {"token": "[REDACTED]"},
         }
     ]
+
+
+async def test_discovery_lists_only_permitted_groups() -> None:
+    server = _create_server(
+        "calculator",
+        Policy("calculator", ("broker_discover", "calc_*"), ("calc_sub",)),
+        {
+            name: ToolDefinition(
+                tool_id=name,
+                description=name,
+                input_schema={"type": "object", "additionalProperties": False},
+                handler=_add,
+            )
+            for name in ("calc_add", "calc_sub", "other_tool")
+        },
+    )
+    result = await server.request_handlers[mcp_types.CallToolRequest](
+        mcp_types.CallToolRequest(
+            method="tools/call",
+            params=mcp_types.CallToolRequestParams(
+                name="broker_discover", arguments={"operation": "groups"}
+            ),
+        )
+    )
+    assert isinstance(result.root, mcp_types.CallToolResult)
+    assert not result.root.isError
+    assert isinstance(result.root.content[0], mcp_types.TextContent)
+    assert json.loads(result.root.content[0].text) == {
+        "version": 1,
+        "groups": [{"name": "calc", "count": 1}],
+    }
 
 
 async def test_list_tools_excludes_tools_denied_by_principal_policy() -> None:

@@ -27,6 +27,17 @@ MCP was chosen as an emerging standard for agent-to-tool communication.
 
 This is an internal project released publicly as-is. Deployment-specific tools, policies, credentials, and infrastructure configuration are maintained separately and are not included.
 
+## Broker discovery contract
+
+`broker_discover` is reserved for the broker. Policy must allow it (a matching wildcard also allows it); explicit deny takes precedence. It is excluded from its own results. Results contain only tools permitted to the authenticated principal, sorted by group and tool name, with no schemas:
+
+- `{"operation":"groups"}` returns `{"version":1,"groups":[{"name":"calc","count":1}]}`.
+- `{"operation":"tools","group":"calc"}` returns `{"version":1,"group":"calc","tools":[{"name":"calc_add","description":"Add."}]}`.
+
+Unknown or invisible groups return an MCP error `unknown group`. Invalid combinations or malformed arguments return an MCP error. Standard MCP tool listing and schema inspection remain available independently.
+
+New definitions should declare `group` as a lowercase single-word ID matching the `group_` tool ID prefix. As a temporary startup bridge, omitted groups are inferred from the prefix before the first underscore (or the entire legacy ID if no underscore exists); this does not validate a matching prefix for legacy IDs. Configuration validation must later require explicit groups before this bridge is removed. Deploy a compatible runtime before group-bearing definitions; an older runtime cannot load them. Coordinate the configuration CI image pin, health and discovery checks, and rollback order before rollout; restore old definitions before rolling back the runtime. Existing wildcard policies may permit the new reserved ID, so review them before deployment.
+
 ## Development
 
 ```bash

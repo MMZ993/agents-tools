@@ -17,19 +17,41 @@ var toolsCmd = &cobra.Command{
 
 // ---------- list ----------
 
+var listGroup string
+var listAll bool
+
 var toolsListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List tools available to the authenticated principal",
+	Short: "Discover groups or list tools available to the authenticated principal",
+	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		if listAll && cmd.Flags().Changed("group") {
+			fatal("--all and --group cannot be combined")
+			return
+		}
+		if cmd.Flags().Changed("group") && listGroup == "" {
+			fatal("--group must not be empty")
+			return
+		}
 		c, err := client.New()
 		if err != nil {
 			fatal("%v", err)
 		}
-		tools, err := c.ListTools()
+		if listAll {
+			tools, err := c.ListTools()
+			if err != nil {
+				fatal("%v", err)
+				return
+			}
+			printJSON(tools)
+			return
+		}
+		result, err := c.Discover(listGroup)
 		if err != nil {
 			fatal("%v", err)
+			return
 		}
-		printJSON(tools)
+		printRawJSON(result)
 	},
 }
 
@@ -129,6 +151,8 @@ var toolsSchemaCmd = &cobra.Command{
 }
 
 func init() {
+	toolsListCmd.Flags().StringVar(&listGroup, "group", "", "List tools in a discovery group")
+	toolsListCmd.Flags().BoolVar(&listAll, "all", false, "List complete MCP tools including schemas")
 	toolsCallCmd.Flags().StringSliceVar(&callArgsFlags, "arg", nil, "key=value argument (repeatable; coerced to bool/int/string)")
 	toolsCallCmd.Flags().StringVar(&callJSON, "json", "", "JSON object of arguments (applied before --arg overrides)")
 

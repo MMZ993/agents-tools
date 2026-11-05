@@ -20,11 +20,21 @@ class ToolDefinition:
     input_schema: Mapping[str, object]
     handler: ToolHandler
     redact_fields: frozenset[str] = field(default_factory=frozenset)
+    group: str | None = None
 
     def __post_init__(self) -> None:
         if not _TOOL_ID_PATTERN.fullmatch(self.tool_id):
             msg = f"invalid tool ID: {self.tool_id!r}"
             raise ValueError(msg)
+        if self.group is None:
+            # Temporary compatibility for definitions predating explicit groups.
+            object.__setattr__(self, "group", self.tool_id.split("_", 1)[0])
+        elif (
+            not isinstance(self.group, str)
+            or not re.fullmatch(r"[a-z][a-z0-9]*", self.group)
+            or not self.tool_id.startswith(self.group + "_")
+        ):
+            raise ValueError("invalid tool group or tool ID prefix")
         if not isinstance(self.description, str):
             raise TypeError("tool description must be a string")
         if not self.description:

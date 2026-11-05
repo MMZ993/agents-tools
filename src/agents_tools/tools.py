@@ -9,6 +9,9 @@ from types import ModuleType
 from agents_tools.models import ToolDefinition
 
 
+DISCOVERY_TOOL_ID = "broker_discover"
+
+
 class ToolRegistrationError(RuntimeError):
     """Raised when an external tool module cannot be registered safely."""
 
@@ -22,6 +25,8 @@ def discover_tools(tools_directory: Path) -> dict[str, ToolDefinition]:
     registered_tools: dict[str, ToolDefinition] = {}
     for tool_file in sorted(tools_directory.glob("*/tool.py")):
         for definition in _load_registrations(tool_file):
+            if definition.tool_id == DISCOVERY_TOOL_ID:
+                raise ToolRegistrationError(f"reserved tool ID: {definition.tool_id}")
             if definition.tool_id in registered_tools:
                 msg = f"duplicate tool ID: {definition.tool_id}"
                 raise ToolRegistrationError(msg)

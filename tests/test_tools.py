@@ -11,6 +11,39 @@ async def _handler(_: dict[str, object]) -> None:
     return None
 
 
+@pytest.mark.parametrize("group", ["", "Bad", "two_words", "other", "calc-"])
+def test_tool_definition_rejects_invalid_explicit_group(group: str) -> None:
+    with pytest.raises(ValueError, match="group"):
+        ToolDefinition(
+            "calc_add",
+            "Add.",
+            {"type": "object", "additionalProperties": False},
+            _handler,
+            group=group,
+        )
+
+
+def test_legacy_group_is_inferred_even_without_separator() -> None:
+    tool = ToolDefinition(
+        "legacy", "Legacy.", {"type": "object", "additionalProperties": False}, _handler
+    )
+    assert tool.group == "legacy"
+
+
+def test_discover_tools_rejects_reserved_id(tmp_path: Path) -> None:
+    tool_file = tmp_path / "reserved" / "tool.py"
+    tool_file.parent.mkdir()
+    tool_file.write_text("""
+from agents_tools.models import ToolDefinition
+async def handler(arguments):
+    return None
+def register():
+    return [ToolDefinition("broker_discover", "Reserved.", {"type": "object", "additionalProperties": False}, handler)]
+""")
+    with pytest.raises(ToolRegistrationError, match="reserved tool ID"):
+        discover_tools(tmp_path)
+
+
 def test_tool_definition_rejects_non_string_description() -> None:
     with pytest.raises(TypeError, match="description"):
         ToolDefinition(
