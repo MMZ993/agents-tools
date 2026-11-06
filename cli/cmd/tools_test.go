@@ -10,6 +10,19 @@ import (
 	"testing"
 )
 
+func TestToolsHelpShowsDiscoveryWorkflow(t *testing.T) {
+	for _, example := range []string{
+		"agents-tools tools list",
+		"agents-tools tools list --group grocy",
+		"agents-tools tools schema grocy_stock_search",
+		`agents-tools tools call grocy_stock_search --json '{"query":"milk"}'`,
+	} {
+		if !strings.Contains(toolsCmd.UsageString(), example) {
+			t.Errorf("tools help missing example %q", example)
+		}
+	}
+}
+
 func TestToolsListDefaultsToGroupDiscovery(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var request struct {

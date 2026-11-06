@@ -13,6 +13,11 @@ import (
 var toolsCmd = &cobra.Command{
 	Use:   "tools",
 	Short: "List and call MCP tools",
+	Long:  "Discover groups, inspect tool schemas, and call tools available to the authenticated principal.",
+	Example: `  agents-tools tools list
+  agents-tools tools list --group grocy
+  agents-tools tools schema grocy_stock_search
+  agents-tools tools call grocy_stock_search --json '{"query":"milk"}'`,
 }
 
 // ---------- list ----------
@@ -23,6 +28,7 @@ var listAll bool
 var toolsListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "Discover groups or list tools available to the authenticated principal",
+	Long:  "List groups by default. Use --group to list tools in a group, or --all for the complete MCP tool list and schemas.",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		if listAll && cmd.Flags().Changed("group") {
